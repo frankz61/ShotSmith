@@ -1,0 +1,35 @@
+[project]
+name = "shotsmith"
+version = "0.1.0"
+description = "AI 电商商品素材图生成工具"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "sqlalchemy>=2.0",
+    "pymysql>=1.1",
+    "celery>=5.3",
+    "redis>=5.0",
+    "pillow>=10.0",
+    "httpx>=0.27",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.9"]
+# BiRefNet 需要 rembg 较新版本
+matting = ["rembg>=2.0.57", "onnxruntime>=1.17"]
+# 阿里通义万相·背景生成（imagegen_provider=aliyun_bg）：仅用其 OssUtils 上传本地图
+aliyun = ["dashscope>=1.20"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 100
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

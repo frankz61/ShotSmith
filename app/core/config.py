@@ -1,0 +1,41 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    app_env: str = "dev"
+    # 真实地址在 .env；此处仅为通用默认
+    database_url: str = "mysql+pymysql://shotsmith:shotsmith@localhost:3306/shotsmith?charset=utf8mb4"
+    redis_url: str = "redis://localhost:6379/0"
+    storage_dir: str = "./data"
+
+    # 模型 Provider 选择（见 app/providers/registry.py）
+    # matting: rembg(质量优,需 .[matting]) / simple(纯 Pillow,离线可跑)
+    matting_provider: str = "rembg"
+    # rembg 模型：birefnet-general 当前质量最佳；备选 isnet-general-use / u2net
+    matting_model: str = "birefnet-general"
+    # imagegen: local(Pillow 合成,离线可跑) / aliyun_bg(阿里通义万相·背景生成) / vendor_a(其它商用 API)
+    imagegen_provider: str = "local"
+    # fidelity: simple(Pillow 比对) / dinov2(向量相似,需 torch)
+    fidelity_provider: str = "simple"
+
+    # 商用图像 API（vendor_a 时使用）
+    imagegen_api_key: str = ""
+    imagegen_api_base: str = ""
+
+    # 阿里通义万相·背景生成（imagegen_provider=aliyun_bg 时使用，需 .[aliyun]）
+    # 在百炼控制台开通后获取 API-KEY；SDK/HTTP 均用此鉴权
+    dashscope_api_key: str = ""
+    aliyun_bg_model: str = "wanx-background-generation-v2"
+    aliyun_bg_model_version: str = "v2"   # v2 / v3（v3 需配套权限）
+    aliyun_bg_noise_level: int = 300      # 0~999，越大背景与主体差异越大
+    aliyun_bg_ref_prompt_weight: float = 0.5  # 0~1，文本引导权重
+    aliyun_poll_interval: float = 3.0     # 轮询任务结果的间隔（秒）
+    aliyun_poll_timeout: float = 180.0    # 单个任务等待上限（秒）
+
+    # 还原度阈值 τ：低于此值的素材转人工复核
+    fidelity_threshold: float = 0.85
+
+
+settings = Settings()

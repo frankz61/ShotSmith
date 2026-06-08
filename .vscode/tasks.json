@@ -1,0 +1,26 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "install: backend",
+      "type": "shell",
+      "command": "pip install -e \".[dev]\"",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "db: create tables",
+      "type": "shell",
+      "command": "python scripts/init_db.py",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "web: dev",
+      "type": "shell",
+      "command": "pnpm install && pnpm dev",
+      "options": { "cwd": "${workspaceFolder}/web" },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+# Redis 与 MySQL 使用外部服务（地址/密码在 .env），此处只起应用进程。
+services:
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 28000
+    env_file: .env
+    ports: ["28000:28000"]
+
+  worker:
+    build: .
+    command: celery -A app.tasks.celery_app.celery_app worker --loglevel=info
+    env_file: .env
