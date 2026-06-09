@@ -91,6 +91,27 @@ export default function App() {
     });
   }
 
+  // 支持直接 Ctrl/⌘+V 粘贴剪贴板里的图片，无需上传或填 URL
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (it.type.startsWith("image/")) {
+          const f = it.getAsFile();
+          if (f) {
+            onPickFile(f);
+            e.preventDefault();
+          }
+          return;
+        }
+      }
+    }
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
+
   function poll(id: string) {
     if (timer.current) window.clearInterval(timer.current);
     timer.current = window.setInterval(async () => {
@@ -183,7 +204,7 @@ export default function App() {
               ) : (
                 <div>
                   <div className="dz-icon">🖼️</div>
-                  <div className="dz-main">点击上传商品图</div>
+                  <div className="dz-main">点击上传，或 Ctrl+V 粘贴图片</div>
                   <div className="dz-sub">支持 JPG / PNG / WebP，建议主体清晰</div>
                 </div>
               )}
