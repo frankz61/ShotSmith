@@ -6,15 +6,26 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.schemas import AssetOut, SelectIn, TaskOut, TaskSummary
+from app.api.schemas import AssetOut, LoginIn, SelectIn, TaskOut, TaskSummary, TokenOut
+from app.core.security import check_password, make_token, require_auth
 from app.models.db import get_db
 from app.models.task import Asset, Task
 from app.services import packaging
 from app.storage.local import LocalStorage
 from app.tasks.jobs import run_pipeline
 
-router = APIRouter(prefix="/api/v1", tags=["tasks"])
+# 登录路由不鉴权；其余业务路由统一挂 require_auth 依赖
+auth_router = APIRouter(prefix="/api/v1", tags=["auth"])
+router = APIRouter(prefix="/api/v1", tags=["tasks"], dependencies=[Depends(require_auth)])
 storage = LocalStorage()
+
+
+@auth_router.post("/auth/login", response_model=TokenOut)
+def login(body: LoginIn) -> TokenOut:
+    if not check_password(body.password):
+        raise HTTPException(401, "密码错误")
+    token, ttl = make_token()
+    return TokenOut(token=token, expires_in=ttl)
 
 
 def _source_image(task: Task) -> str | None:
@@ -101,6 +112,16 @@ def regenerate(task_id: uuid.UUID, db: Session = Depends(get_db)) -> Task:
     db.refresh(task)
     run_pipeline.delay(str(task.id))
     return task
+
+
+@router.delete("/tasks/{task_id}", status_code=204)
+def delete_task(task_id: uuid.UUID, db: Session = Depends(get_db)) -> None:
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(404, "任务不存在")
+    db.delete(task)            # assets 经 delete-orphan 级联删除
+    db.commit()
+    storage.remove_task_dir(str(task_id))   # 同步清理磁盘文件
 
 
 @router.post("/assets/{asset_id}/select", response_model=AssetOut)

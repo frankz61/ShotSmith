@@ -46,3 +46,12 @@ class TaskSummary(BaseModel):
 
 class SelectIn(BaseModel):
     selected: bool
+
+
+class LoginIn(BaseModel):
+    password: str
+
+
+class TokenOut(BaseModel):
+    token: str
+    expires_in: int

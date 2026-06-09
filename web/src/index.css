@@ -177,13 +177,13 @@ body {
 .btn-primary:disabled { box-shadow: none; }
 
 /* ---------- two columns ---------- */
-.layout { display: grid; grid-template-columns: 280px 1fr; gap: 22px; align-items: start; }
+.layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 22px; align-items: start; }
 @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
 
 .side-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .side-head h3 { margin: 0; font-size: 15px; }
 
-.history { list-style: none; padding: 0; margin: 0; display: grid; gap: 9px; }
+.history { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 9px; }
 .history-item {
   border: 1px solid var(--line);
   border-radius: 11px;
@@ -287,3 +287,39 @@ body {
 .empty { color: var(--ink-faint); font-size: 14px; padding: 28px 4px; text-align: center; }
 .empty-lg { padding: 60px 20px; }
 .empty .e-icon { font-size: 34px; margin-bottom: 10px; }
+
+/* ---------- login gate ---------- */
+.topbar-logout { margin-left: auto; }
+.login-wrap {
+  min-height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.login-card {
+  width: 100%; max-width: 360px;
+  padding: 34px 30px 30px;
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center;
+}
+.login-logo {
+  width: 52px; height: 52px; border-radius: 15px;
+  font-size: 24px; font-weight: 700; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 16px;
+}
+.login-title { font-size: 22px; font-weight: 700; color: var(--ink); }
+.login-sub { font-size: 13.5px; color: var(--ink-soft); margin: 6px 0 22px; }
+.login-card .input { width: 100%; text-align: center; }
+.login-err { color: var(--red); font-size: 13px; margin-top: 12px; }
+.login-btn { width: 100%; margin-top: 18px; }
+
+/* history delete button */
+.history-item { position: relative; min-width: 0; overflow: hidden; }
+.history-del {
+  margin-left: auto; flex: none;
+  border: none; background: transparent; cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 6px; border-radius: 8px;
+  opacity: 0; transition: opacity 0.15s, background 0.15s;
+}
+.history-item:hover .history-del { opacity: 0.55; }
+.history-del:hover { opacity: 1; background: var(--red-bg); }

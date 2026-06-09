@@ -6,6 +6,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 25173,
+    // 允许通过 ngrok 等隧道访问：前导点 = 该域名及其所有子域（免每次换隧道再改）
+    allowedHosts: [".ngrok-free.app", ".ngrok.app", ".ngrok.io"],
     proxy: {
       "/api": "http://localhost:28000",
       "/files": "http://localhost:28000",

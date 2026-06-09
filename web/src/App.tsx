@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import Login from "./Login";
 import {
+  clearToken,
   createTask,
+  deleteTask,
   fileUrl,
   getTask,
+  getToken,
   listTasks,
   packageUrl,
   regenerate,
   selectAsset,
+  setOnUnauthorized,
   type Asset,
   type Task,
   type TaskSummary,
@@ -33,6 +38,7 @@ function qcBadge(s: string): { cls: string; text: string } {
 }
 
 export default function App() {
+  const [authed, setAuthed] = useState<boolean>(() => !!getToken());
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [desc, setDesc] = useState("");
@@ -52,8 +58,22 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    refreshHistory();
-  }, [refreshHistory]);
+    // 令牌失效（任意请求 401）时退回登录页
+    setOnUnauthorized(() => {
+      setAuthed(false);
+      setTask(null);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (authed) refreshHistory();
+  }, [authed, refreshHistory]);
+
+  function logout() {
+    clearToken();
+    setAuthed(false);
+    setTask(null);
+  }
 
   useEffect(
     () => () => {
@@ -117,7 +137,20 @@ export default function App() {
     if (task) setTask(await getTask(task.id));
   }
 
+  async function onDelete(id: string) {
+    if (!window.confirm("确定删除这条历史记录？将同时删除生成的素材，且不可恢复。")) return;
+    try {
+      await deleteTask(id);
+      if (task?.id === id) setTask(null);
+      refreshHistory();
+    } catch {
+      /* 401 等已由 apiFetch 统一处理 */
+    }
+  }
+
   const assets = task?.assets.filter((a) => a.type !== "cutout") ?? [];
+
+  if (!authed) return <Login onSuccess={() => setAuthed(true)} />;
 
   return (
     <>
@@ -128,6 +161,9 @@ export default function App() {
             <div className="brand-title">ShotSmith</div>
             <div className="brand-sub">AI 电商商品素材图生成 · 抠图保真 · 一键多尺寸</div>
           </div>
+          <button className="btn btn-sm topbar-logout" onClick={logout}>
+            退出
+          </button>
         </div>
       </header>
 
@@ -228,6 +264,16 @@ export default function App() {
                       {new Date(h.created_at).toLocaleString()}
                     </div>
                   </div>
+                  <button
+                    className="history-del"
+                    title="删除记录"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(h.id);
+                    }}
+                  >
+                    🗑
+                  </button>
                 </li>
               ))}
               {history.length === 0 && <li className="empty">暂无记录</li>}

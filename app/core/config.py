@@ -44,5 +44,12 @@ class Settings(BaseSettings):
     # 还原度阈值 τ：低于此值的素材转人工复核
     fidelity_threshold: float = 0.85
 
+    # 访问鉴权：前端输入密码 → /auth/login 换取签名令牌 → 后续请求带 Bearer
+    auth_enabled: bool = True
+    access_password: str = "frankz61_shotsmith"
+    # 令牌 HMAC 签名密钥（生产务必在 .env 覆盖为随机值）
+    auth_secret: str = "shotsmith-dev-secret-change-me"
+    auth_token_ttl: int = 7 * 24 * 3600   # 令牌有效期（秒），默认 7 天
+
 
 settings = Settings()

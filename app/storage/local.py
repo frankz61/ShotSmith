@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 from app.core.config import settings
@@ -31,3 +32,9 @@ class LocalStorage:
         for p in sorted(self.task_dir(task_id).glob("00_source.*")):
             return p
         return None
+
+    def remove_task_dir(self, task_id: str) -> None:
+        """删除整个任务目录（原图 + 全部生成素材）。目录不存在则静默跳过。"""
+        d = self.base / "tasks" / str(task_id)
+        if d.exists():
+            shutil.rmtree(d, ignore_errors=True)
