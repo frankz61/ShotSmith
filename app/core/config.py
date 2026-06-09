@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     imagegen_api_key: str = ""
     imagegen_api_base: str = ""
 
+    # Qwen-VL 看图写提示词：调用万相前先让多模态大模型结合去背景图生成场景提示词
+    # 复用 dashscope_api_key 鉴权；走 DashScope OpenAI 兼容端点（仅需 httpx）
+    prompt_vlm_enabled: bool = True
+    # 多模态模型 ID：qwen3.7-plus 支持多模态看图（按百炼已开通模型填写）
+    vlm_model: str = "qwen3.7-plus"
+    vlm_timeout: float = 60.0             # VLM 单次请求超时（秒）
+
     # 阿里通义万相·背景生成（imagegen_provider=aliyun_bg 时使用，需 .[aliyun]）
     # 在百炼控制台开通后获取 API-KEY；SDK/HTTP 均用此鉴权
     dashscope_api_key: str = ""

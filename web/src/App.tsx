@@ -14,19 +14,27 @@ import {
 
 const DONE = ["success", "partial", "failed"];
 
-function statusLabel(s: string): string {
-  const m: Record<string, string> = {
-    pending: "排队中",
-    processing: "处理中",
-    success: "完成",
-    partial: "部分完成",
-    failed: "失败",
-  };
-  return m[s] ?? s;
+const STATUS_LABEL: Record<string, string> = {
+  pending: "排队中",
+  processing: "处理中",
+  success: "完成",
+  partial: "部分完成",
+  failed: "失败",
+};
+const statusLabel = (s: string) => STATUS_LABEL[s] ?? s;
+
+const TYPE_LABEL: Record<string, string> = { white_bg: "白底主图", scene: "场景图" };
+const typeLabel = (t: string) => TYPE_LABEL[t] ?? t;
+
+function qcBadge(s: string): { cls: string; text: string } {
+  if (s === "passed") return { cls: "badge-pass", text: "通过" };
+  if (s === "needs_review") return { cls: "badge-review", text: "待复核" };
+  return { cls: "badge-pending", text: "待校验" };
 }
 
 export default function App() {
   const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [desc, setDesc] = useState("");
   const [url, setUrl] = useState("");
   const [engine, setEngine] = useState("local"); // 场景图引擎：local 纯色 / aliyun_bg 在线万相
@@ -50,9 +58,18 @@ export default function App() {
   useEffect(
     () => () => {
       if (timer.current) window.clearInterval(timer.current);
+      if (preview) URL.revokeObjectURL(preview);
     },
-    [],
+    [preview],
   );
+
+  function onPickFile(f: File | null) {
+    setFile(f);
+    setPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return f ? URL.createObjectURL(f) : null;
+    });
+  }
 
   function poll(id: string) {
     if (timer.current) window.clearInterval(timer.current);
@@ -103,151 +120,199 @@ export default function App() {
   const assets = task?.assets.filter((a) => a.type !== "cutout") ?? [];
 
   return (
-    <main style={{ maxWidth: 1100, margin: "24px auto", fontFamily: "system-ui", padding: 16 }}>
-      <h1>ShotSmith</h1>
-      <p style={{ color: "#666" }}>上传商品图 + 可选描述，自动生成白底图与场景图。</p>
-
-      <section style={{ display: "grid", gap: 8, marginBottom: 20 }}>
-        <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-        <input placeholder="或粘贴图片 URL" value={url} onChange={(e) => setUrl(e.target.value)} />
-        <input
-          placeholder="商品描述/场景（可选）"
-          value={desc}
-          onChange={(e) => setDesc(e.target.value)}
-        />
-        <label style={{ fontSize: 13, color: "#555", display: "flex", alignItems: "center", gap: 8 }}>
-          场景图引擎：
-          <select value={engine} onChange={(e) => setEngine(e.target.value)} style={{ padding: 4 }}>
-            <option value="local">纯色背景（离线 · 免费）</option>
-            <option value="aliyun_bg">在线万相 AI（更真实 · 调用阿里）</option>
-          </select>
-        </label>
-        <button onClick={onSubmit} disabled={busy || (!file && !url)}>
-          {busy ? "提交中…" : "开始生成"}
-        </button>
-      </section>
-
-      <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-        <aside style={{ width: 260, flexShrink: 0 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <h3 style={{ margin: "0 0 8px" }}>历史记录</h3>
-            <button onClick={refreshHistory} style={{ fontSize: 12 }}>
-              刷新
-            </button>
+    <>
+      <header className="topbar">
+        <div className="topbar-inner">
+          <div className="brand-logo">S</div>
+          <div>
+            <div className="brand-title">ShotSmith</div>
+            <div className="brand-sub">AI 电商商品素材图生成 · 抠图保真 · 一键多尺寸</div>
           </div>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
-            {history.map((h) => (
-              <li
-                key={h.id}
-                onClick={() => openTask(h.id)}
-                style={{
-                  border: "1px solid #eee",
-                  borderRadius: 8,
-                  padding: 8,
-                  cursor: "pointer",
-                  background: task?.id === h.id ? "#eef4ff" : "#fff",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {h.description || "（无描述）"}
-                </div>
-                <div style={{ fontSize: 11, color: "#888" }}>
-                  {statusLabel(h.status)} · {new Date(h.created_at).toLocaleString()}
-                </div>
-              </li>
-            ))}
-            {history.length === 0 && (
-              <li style={{ color: "#999", fontSize: 13 }}>暂无记录</li>
-            )}
-          </ul>
-        </aside>
+        </div>
+      </header>
 
-        <section style={{ flex: 1 }}>
-          {!task && <p style={{ color: "#999" }}>从左侧历史记录选择，或上传新图开始。</p>}
-          {task && (
-            <>
-              <p>
-                状态：<b>{statusLabel(task.status)}</b>
-                {task.current_stage && ` · ${task.current_stage}`} · {task.progress}%
-                {task.error_message && (
-                  <span style={{ color: "crimson" }}> · {task.error_message}</span>
-                )}
-              </p>
-              <div style={{ height: 6, background: "#eee", borderRadius: 3 }}>
-                <div
-                  style={{
-                    width: `${task.progress}%`,
-                    height: 6,
-                    background: "#4f8cff",
-                    borderRadius: 3,
-                  }}
-                />
-              </div>
-
-              {DONE.includes(task.status) && (
-                <div style={{ margin: "12px 0", display: "flex", gap: 8 }}>
-                  <button onClick={onRegenerate}>重新生成</button>
-                  <a href={packageUrl(task.id)}>
-                    <button>下载素材包</button>
-                  </a>
+      <div className="container">
+        {/* 创建任务 */}
+        <section className="panel create">
+          <div>
+            <label className="field-label">商品图</label>
+            <label className="dropzone">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+              />
+              {preview ? (
+                <img src={preview} alt="预览" />
+              ) : (
+                <div>
+                  <div className="dz-icon">🖼️</div>
+                  <div className="dz-main">点击上传商品图</div>
+                  <div className="dz-sub">支持 JPG / PNG / WebP，建议主体清晰</div>
                 </div>
               )}
+            </label>
+          </div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))",
-                  gap: 12,
-                }}
-              >
-                {assets.map((a) => (
-                  <figure
-                    key={a.id}
-                    style={{ margin: 0, border: "1px solid #eee", borderRadius: 8, padding: 8 }}
-                  >
-                    <img
-                      src={fileUrl(a.path)}
-                      alt={a.type}
-                      style={{ width: "100%", borderRadius: 4 }}
-                    />
-                    <figcaption style={{ fontSize: 12, color: "#555", marginTop: 6 }}>
-                      {a.type} · {a.size_label}
-                      <br />
-                      还原度 {a.fidelity_score ?? "-"} ·{" "}
-                      <span style={{ color: a.qc_status === "passed" ? "green" : "orange" }}>
-                        {a.qc_status}
-                      </span>
-                      <br />
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={a.selected}
-                          onChange={() => onToggle(a)}
-                        />{" "}
-                        选用
-                      </label>
-                    </figcaption>
-                  </figure>
-                ))}
+          <div className="stack">
+            <div>
+              <label className="field-label">或粘贴图片 URL</label>
+              <input
+                className="input"
+                placeholder="https://…"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label">商品描述 / 场景（可选）</label>
+              <input
+                className="input"
+                placeholder="如：户外冲锋衣，山野自然光场景"
+                value={desc}
+                onChange={(e) => setDesc(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label">场景图引擎</label>
+              <div className="segment">
+                <button
+                  className={engine === "local" ? "active" : ""}
+                  onClick={() => setEngine("local")}
+                >
+                  纯色背景
+                  <span className="seg-sub">离线 · 免费</span>
+                </button>
+                <button
+                  className={engine === "aliyun_bg" ? "active" : ""}
+                  onClick={() => setEngine("aliyun_bg")}
+                >
+                  在线万相 AI
+                  <span className="seg-sub">更真实 · 调用阿里</span>
+                </button>
               </div>
-            </>
-          )}
+            </div>
+            <button
+              className="btn btn-primary"
+              onClick={onSubmit}
+              disabled={busy || (!file && !url)}
+            >
+              {busy ? "提交中…" : "开始生成"}
+            </button>
+          </div>
         </section>
+
+        {/* 历史 + 结果 */}
+        <div className="layout">
+          <aside>
+            <div className="side-head">
+              <h3>历史记录</h3>
+              <button className="btn btn-sm" onClick={refreshHistory}>
+                刷新
+              </button>
+            </div>
+            <ul className="history">
+              {history.map((h) => (
+                <li
+                  key={h.id}
+                  className={`history-item${task?.id === h.id ? " active" : ""}`}
+                  onClick={() => openTask(h.id)}
+                >
+                  {h.source_image && (
+                    <img className="history-thumb" src={h.source_image} alt="" />
+                  )}
+                  <div className="history-text">
+                    <div className="history-title">{h.description || "（无描述）"}</div>
+                    <div className="history-meta">
+                      <span className={`pill pill-${h.status}`}>{statusLabel(h.status)}</span>
+                      {new Date(h.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                </li>
+              ))}
+              {history.length === 0 && <li className="empty">暂无记录</li>}
+            </ul>
+          </aside>
+
+          <section className="panel main-card">
+            {!task && (
+              <div className="empty empty-lg">
+                <div className="e-icon">✨</div>
+                从左侧历史记录选择，或上传新图开始生成
+              </div>
+            )}
+            {task && (
+              <>
+                {task.source_image && (
+                  <div className="source-row">
+                    <img className="source-thumb" src={task.source_image} alt="原图" />
+                    <div className="source-cap">
+                      原图<span>{task.description || "（无描述）"}</span>
+                    </div>
+                  </div>
+                )}
+                <div className="status-row">
+                  <span className={`pill pill-${task.status}`}>{statusLabel(task.status)}</span>
+                  {task.current_stage && <span className="status-stage">{task.current_stage}</span>}
+                  <span className="status-stage">{task.progress}%</span>
+                  {task.error_message && <span className="status-err">· {task.error_message}</span>}
+                </div>
+                <div className="progress">
+                  <div className="progress-bar" style={{ width: `${task.progress}%` }} />
+                </div>
+
+                {DONE.includes(task.status) && (
+                  <div className="toolbar">
+                    <button className="btn" onClick={onRegenerate}>
+                      重新生成
+                    </button>
+                    <a href={packageUrl(task.id)}>
+                      <button className="btn btn-primary">下载素材包</button>
+                    </a>
+                  </div>
+                )}
+
+                {assets.length > 0 && (
+                  <div className="grid">
+                    {assets.map((a) => {
+                      const b = qcBadge(a.qc_status);
+                      return (
+                        <figure
+                          key={a.id}
+                          className={`asset${a.selected ? " selected" : ""}`}
+                          style={{ margin: 0 }}
+                        >
+                          <img className="asset-thumb" src={fileUrl(a.path)} alt={a.type} />
+                          <figcaption className="asset-body">
+                            <div className="asset-row">
+                              <span className="asset-type">{typeLabel(a.type)}</span>
+                              <span className="asset-size">{a.size_label}</span>
+                            </div>
+                            <div className="asset-row">
+                              <span className="fidelity">
+                                还原度 <b>{a.fidelity_score ?? "-"}</b>
+                              </span>
+                              <span className={`badge ${b.cls}`}>{b.text}</span>
+                            </div>
+                            <label className="select-row">
+                              <input
+                                type="checkbox"
+                                checked={a.selected}
+                                onChange={() => onToggle(a)}
+                              />
+                              选用
+                            </label>
+                          </figcaption>
+                        </figure>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </div>
       </div>
-    </main>
+    </>
   );
 }

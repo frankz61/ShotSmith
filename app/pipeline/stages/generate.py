@@ -30,6 +30,7 @@ def run(cutout_path: str, storage, task_id: str, imagegen, opts: dict, prompt: s
             items.append({
                 "type": "scene", "size_label": g.size_label, "path": storage.rel(Path(g.path)),
                 "gen_params": {"provider": opts.get("scene_engine") or settings.imagegen_provider,
-                               "prompt": prompt, "seed": g.seed, **(g.meta or {})},
+                               "prompt": prompt, "prompt_source": opts.get("prompt_source"),
+                               "seed": g.seed, **(g.meta or {})},
             })
     return items

@@ -26,6 +26,7 @@ class TaskOut(BaseModel):
     description: str | None
     error_message: str | None
     created_at: datetime
+    source_image: str | None = None  # 原图可展示地址（本地 /files/… 或外链 URL）
     assets: list[AssetOut] = []
 
 
@@ -40,6 +41,7 @@ class TaskSummary(BaseModel):
     progress: int
     description: str | None
     created_at: datetime
+    source_image: str | None = None  # 原图可展示地址（本地 /files/… 或外链 URL）
 
 
 class SelectIn(BaseModel):

@@ -11,7 +11,7 @@ from app.models.task import Asset, Task
 from app.pipeline.stages import generate, ingest, matting, preprocess, quality
 from app.providers import registry
 from app.services import packaging
-from app.services.prompt import build_prompt
+from app.services.prompt import resolve_scene_prompt
 from app.storage.local import LocalStorage
 
 
@@ -52,7 +52,8 @@ def run(task_id: str) -> None:
         _set(db, task, "processing", "matting", 35)
         cutout = matting.run(prep, storage, str(task.id), registry.get_matting())
         _set(db, task, "processing", "generate", 55)
-        prompt = build_prompt(task.description, opts)
+        # 调用万相前：先让 Qwen-VL 看抠图写场景提示词（失败回落模板）
+        prompt, opts["prompt_source"] = resolve_scene_prompt(cutout, task.description, opts)
         imagegen = registry.get_imagegen(opts["scene_engine"])
         items = generate.run(cutout, storage, str(task.id), imagegen, opts, prompt)
         _set(db, task, "processing", "qc", 80)

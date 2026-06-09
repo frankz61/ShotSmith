@@ -17,6 +17,16 @@ router = APIRouter(prefix="/api/v1", tags=["tasks"])
 storage = LocalStorage()
 
 
+def _source_image(task: Task) -> str | None:
+    """原图展示地址：本地 00_source.* 优先（/files/…），URL 任务下载前回退到外链。"""
+    src = storage.find_source(str(task.id))
+    if src:
+        return f"/files/{storage.rel(src)}"
+    if task.source_type == "url" and task.source_ref:
+        return task.source_ref
+    return None
+
+
 @router.post("/tasks", response_model=TaskOut, status_code=202)
 async def create_task(
     file: UploadFile | None = File(default=None),
@@ -58,7 +68,10 @@ def list_tasks(limit: int = 50, offset: int = 0, db: Session = Depends(get_db)):
         .limit(min(limit, 200))
         .offset(offset)
     )
-    return db.execute(stmt).scalars().all()
+    tasks = db.execute(stmt).scalars().all()
+    for t in tasks:
+        t.source_image = _source_image(t)
+    return tasks
 
 
 @router.get("/tasks/{task_id}", response_model=TaskOut)
@@ -66,6 +79,7 @@ def get_task(task_id: uuid.UUID, db: Session = Depends(get_db)) -> Task:
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(404, "任务不存在")
+    task.source_image = _source_image(task)
     return task
 
 

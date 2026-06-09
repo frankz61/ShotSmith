@@ -15,6 +15,7 @@ export interface Task {
   progress: number;
   description: string | null;
   error_message: string | null;
+  source_image: string | null;
   assets: Asset[];
 }
 
@@ -25,6 +26,7 @@ export interface TaskSummary {
   progress: number;
   description: string | null;
   created_at: string;
+  source_image: string | null;
 }
 
 const API = "/api/v1";
