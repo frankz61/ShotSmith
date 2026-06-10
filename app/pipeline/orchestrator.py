@@ -5,13 +5,13 @@
 import uuid
 
 from app.core.config import settings
-from app.core.constants import DEFAULT_SCENE_VARIANTS, DEFAULT_SIZES
+from app.core.constants import DEFAULT_SCENE_COUNT, DEFAULT_SIZES
 from app.models.db import SessionLocal
 from app.models.task import Asset, Task
 from app.pipeline.stages import generate, ingest, matting, preprocess, quality
 from app.providers import registry
 from app.services import packaging
-from app.services.prompt import resolve_scene_prompt
+from app.services.prompt import resolve_scene_prompts
 from app.storage.local import LocalStorage
 
 
@@ -20,10 +20,13 @@ def _opts(raw: dict | None) -> dict:
     return {
         "sizes": raw.get("sizes") or DEFAULT_SIZES,
         "image_types": raw.get("image_types") or ["white_bg", "scene"],
-        "scene_variants": int(raw.get("scene_variants") or DEFAULT_SCENE_VARIANTS),
+        "scene_count": int(raw.get("scene_count") or DEFAULT_SCENE_COUNT),
         "category_hint": raw.get("category_hint"),
-        # 场景图引擎：local(纯色合成) / aliyun_bg(在线万相)；缺省回落全局默认
+        # 场景图引擎：local(纯色合成) / openrouter_image(OpenRouter·Gemini)；缺省回落全局默认
         "scene_engine": raw.get("scene_engine") or settings.imagegen_provider,
+        # 跨境卖家约束：货源参考链接(如 1688 详情页) + 目标零售平台(amazon/walmart/generic)
+        "product_url": (raw.get("product_url") or "").strip() or None,
+        "target_platform": raw.get("target_platform") or "generic",
     }
 
 
@@ -52,10 +55,12 @@ def run(task_id: str) -> None:
         _set(db, task, "processing", "matting", 35)
         cutout = matting.run(prep, storage, str(task.id), registry.get_matting())
         _set(db, task, "processing", "generate", 55)
-        # 调用万相前：先让 Qwen-VL 看抠图写场景提示词（失败回落模板）
-        prompt, opts["prompt_source"] = resolve_scene_prompt(cutout, task.description, opts)
+        # 在线生图前：先经 OpenRouter 两段式（识图+创意）为每张场景图各写一条提示词
+        prompts, opts["prompt_source"] = resolve_scene_prompts(
+            cutout, task.description, opts, opts["scene_count"]
+        )
         imagegen = registry.get_imagegen(opts["scene_engine"])
-        items = generate.run(cutout, storage, str(task.id), imagegen, opts, prompt)
+        items = generate.run(cutout, storage, str(task.id), imagegen, opts, prompts)
         _set(db, task, "processing", "qc", 80)
         quality.run(cutout, items, registry.get_fidelity(), storage)
 

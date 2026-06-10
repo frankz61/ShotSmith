@@ -1,11 +1,14 @@
+import logging
 from pathlib import Path
 
 from app.core.config import settings
 from app.core.constants import SIZE_PRESETS
 from app.services import composition
 
+logger = logging.getLogger(__name__)
 
-def run(cutout_path: str, storage, task_id: str, imagegen, opts: dict, prompt: str) -> list[dict]:
+
+def run(cutout_path: str, storage, task_id: str, imagegen, opts: dict, prompts: list[str]) -> list[dict]:
     sizes = [(label, *SIZE_PRESETS[label]) for label in opts["sizes"] if label in SIZE_PRESETS]
     items: list[dict] = []
 
@@ -21,16 +24,23 @@ def run(cutout_path: str, storage, task_id: str, imagegen, opts: dict, prompt: s
                 "gen_params": {"provider": "composition", "bbox": list(bbox)},
             })
 
-    if "scene" in opts["image_types"]:
+    # 场景图：共 len(prompts) 张，尺寸轮流分配，每张用一条不同的创意提示词
+    if "scene" in opts["image_types"] and sizes:
         sd = storage.task_dir(task_id) / "05_scene"
-        gens = imagegen.generate(cutout_path, prompt, {
-            "out_dir": str(sd), "sizes": sizes, "variants": opts["scene_variants"],
-        })
-        for g in gens:
-            items.append({
-                "type": "scene", "size_label": g.size_label, "path": storage.rel(Path(g.path)),
-                "gen_params": {"provider": opts.get("scene_engine") or settings.imagegen_provider,
-                               "prompt": prompt, "prompt_source": opts.get("prompt_source"),
-                               "seed": g.seed, **(g.meta or {})},
+        for i, prompt in enumerate(prompts):
+            label, w, h = sizes[i % len(sizes)]
+            logger.info("[Generate] 场景图 %d/%d 尺寸 %s 提示词: %r",
+                        i + 1, len(prompts), label, prompt)
+            gens = imagegen.generate(cutout_path, prompt, {
+                "out_dir": str(sd), "sizes": [(label, w, h)],
+                "variants": 1, "seq": i + 1,
             })
+            for g in gens:
+                items.append({
+                    "type": "scene", "size_label": g.size_label,
+                    "path": storage.rel(Path(g.path)),
+                    "gen_params": {"provider": opts.get("scene_engine") or settings.imagegen_provider,
+                                   "prompt": prompt, "prompt_source": opts.get("prompt_source"),
+                                   "seed": g.seed, **(g.meta or {})},
+                })
     return items

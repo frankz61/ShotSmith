@@ -16,13 +16,15 @@ class LocalImageGenProvider:
         out.mkdir(parents=True, exist_ok=True)
         sizes: list[tuple] = params["sizes"]          # [(label, w, h), ...]
         variants = int(params.get("variants", 3))
+        seq = int(params.get("seq", 0))               # 全局序号：用于命名与预设轮换
 
         results: list[GeneratedImage] = []
         for i in range(variants):
-            preset = SCENE_PRESETS[i % len(SCENE_PRESETS)]
+            idx = (seq - 1 + i) if seq else i
+            preset = SCENE_PRESETS[idx % len(SCENE_PRESETS)]
             for label, w, h in sizes:
                 img, bbox = composition.scene(product_cutout, w, h, preset)
-                name = f"scene_{i + 1}_{label.replace(':', 'x')}.png"
+                name = f"scene_{idx + 1}_{label.replace(':', 'x')}.png"
                 fp = out / name
                 img.save(fp)
                 results.append(

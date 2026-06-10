@@ -132,7 +132,7 @@ body {
 .input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-weak); }
 
 /* segmented control */
-.segment { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--gray-bg); padding: 5px; border-radius: 11px; }
+.segment { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; background: var(--gray-bg); padding: 5px; border-radius: 11px; }
 .segment button {
   border: 0;
   background: transparent;

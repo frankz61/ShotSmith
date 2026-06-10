@@ -21,8 +21,6 @@ dependencies = [
 dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.9"]
 # BiRefNet 需要 rembg 较新版本
 matting = ["rembg>=2.0.57", "onnxruntime>=1.17"]
-# 阿里通义万相·背景生成（imagegen_provider=aliyun_bg）：仅用其 OssUtils 上传本地图
-aliyun = ["dashscope>=1.20"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]

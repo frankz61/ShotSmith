@@ -74,12 +74,21 @@ export async function createTask(
   url: string,
   description: string,
   sceneEngine: string,
+  productUrl: string,
+  targetPlatform: string,
 ): Promise<Task> {
   const form = new FormData();
   if (file) form.append("file", file);
   if (url) form.append("url", url);
   if (description) form.append("description", description);
-  form.append("options", JSON.stringify({ scene_engine: sceneEngine }));
+  form.append(
+    "options",
+    JSON.stringify({
+      scene_engine: sceneEngine,
+      product_url: productUrl || undefined,
+      target_platform: targetPlatform,
+    }),
+  );
   const res = await apiFetch(`${API}/tasks`, { method: "POST", body: form });
   if (!res.ok) throw new Error(await res.text());
   return res.json();

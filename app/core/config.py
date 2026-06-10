@@ -15,7 +15,8 @@ class Settings(BaseSettings):
     matting_provider: str = "rembg"
     # rembg 模型：birefnet-general 当前质量最佳；备选 isnet-general-use / u2net
     matting_model: str = "birefnet-general"
-    # imagegen: local(Pillow 合成,离线可跑) / aliyun_bg(阿里通义万相·背景生成) / vendor_a(其它商用 API)
+    # imagegen: local(Pillow 合成,离线可跑) / openrouter_image(OpenRouter·Gemini 生图)
+    #           / vendor_a(其它商用 API)
     imagegen_provider: str = "local"
     # fidelity: simple(Pillow 比对) / dinov2(向量相似,需 torch)
     fidelity_provider: str = "simple"
@@ -24,22 +25,21 @@ class Settings(BaseSettings):
     imagegen_api_key: str = ""
     imagegen_api_base: str = ""
 
-    # Qwen-VL 看图写提示词：调用万相前先让多模态大模型结合去背景图生成场景提示词
-    # 复用 dashscope_api_key 鉴权；走 DashScope OpenAI 兼容端点（仅需 httpx）
+    # 看图写提示词：生成场景图前先让多模态大模型结合去背景图生成场景提示词
     prompt_vlm_enabled: bool = True
-    # 多模态模型 ID：qwen3.7-plus 支持多模态看图（按百炼已开通模型填写）
-    vlm_model: str = "qwen3.7-plus"
     vlm_timeout: float = 60.0             # VLM 单次请求超时（秒）
 
-    # 阿里通义万相·背景生成（imagegen_provider=aliyun_bg 时使用，需 .[aliyun]）
-    # 在百炼控制台开通后获取 API-KEY；SDK/HTTP 均用此鉴权
-    dashscope_api_key: str = ""
-    aliyun_bg_model: str = "wanx-background-generation-v2"
-    aliyun_bg_model_version: str = "v2"   # v2 / v3（v3 需配套权限）
-    aliyun_bg_noise_level: int = 300      # 0~999，越大背景与主体差异越大
-    aliyun_bg_ref_prompt_weight: float = 0.5  # 0~1，文本引导权重
-    aliyun_poll_interval: float = 3.0     # 轮询任务结果的间隔（秒）
-    aliyun_poll_timeout: float = 180.0    # 单个任务等待上限（秒）
+    # OpenRouter：统一网关对接多家模型（VLM 看图写提示词 + Gemini 生图）
+    openrouter_api_key: str = ""
+    openrouter_api_base: str = "https://openrouter.ai/api/v1"
+    # 视觉识别模型：必须选 input_modalities 含 image 的模型，否则带图请求会 404
+    openrouter_vlm_model: str = "google/gemini-3.1-flash-lite"
+    # 创意模型：为每张场景图生成不同的创意提示词。支持图片输入的模型（如
+    # openai/gpt-5.5）单段看图直出；纯文本模型（如 deepseek）自动回落两段式
+    openrouter_text_model: str = "openai/gpt-5.5"
+    openrouter_image_model: str = "google/gemini-3.1-flash-image-preview"
+    openrouter_image_size: str = "1K"     # image_config.image_size：0.5K/1K/2K/4K
+    openrouter_image_timeout: float = 300.0  # 出图单次请求超时（秒）
 
     # 还原度阈值 τ：低于此值的素材转人工复核
     fidelity_threshold: float = 0.85

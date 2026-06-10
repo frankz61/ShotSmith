@@ -43,7 +43,9 @@ export default function App() {
   const [preview, setPreview] = useState<string | null>(null);
   const [desc, setDesc] = useState("");
   const [url, setUrl] = useState("");
-  const [engine, setEngine] = useState("local"); // 场景图引擎：local 纯色 / aliyun_bg 在线万相
+  const [productUrl, setProductUrl] = useState(""); // 货源参考链接（如 1688 详情页）
+  const [platform, setPlatform] = useState("amazon"); // 目标零售平台，约束场景风格
+  const [engine, setEngine] = useState("local"); // 场景图引擎：local 纯色 / openrouter_image 在线 AI
   const [task, setTask] = useState<Task | null>(null);
   const [history, setHistory] = useState<TaskSummary[]>([]);
   const [busy, setBusy] = useState(false);
@@ -131,7 +133,7 @@ export default function App() {
     if (!file && !url) return;
     setBusy(true);
     try {
-      const t = await createTask(file, url, desc, engine);
+      const t = await createTask(file, url, desc, engine, productUrl, platform);
       setTask(t);
       poll(t.id);
       refreshHistory();
@@ -231,6 +233,41 @@ export default function App() {
               />
             </div>
             <div>
+              <label className="field-label">货源参考链接（可选，如 1688 详情页）</label>
+              <input
+                className="input"
+                placeholder="https://detail.1688.com/…"
+                value={productUrl}
+                onChange={(e) => setProductUrl(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="field-label">目标平台</label>
+              <div className="segment">
+                <button
+                  className={platform === "amazon" ? "active" : ""}
+                  onClick={() => setPlatform("amazon")}
+                >
+                  亚马逊
+                  <span className="seg-sub">欧美生活方式</span>
+                </button>
+                <button
+                  className={platform === "walmart" ? "active" : ""}
+                  onClick={() => setPlatform("walmart")}
+                >
+                  Walmart
+                  <span className="seg-sub">美式家庭</span>
+                </button>
+                <button
+                  className={platform === "generic" ? "active" : ""}
+                  onClick={() => setPlatform("generic")}
+                >
+                  通用
+                  <span className="seg-sub">简洁高级</span>
+                </button>
+              </div>
+            </div>
+            <div>
               <label className="field-label">场景图引擎</label>
               <div className="segment">
                 <button
@@ -241,11 +278,11 @@ export default function App() {
                   <span className="seg-sub">离线 · 免费</span>
                 </button>
                 <button
-                  className={engine === "aliyun_bg" ? "active" : ""}
-                  onClick={() => setEngine("aliyun_bg")}
+                  className={engine === "openrouter_image" ? "active" : ""}
+                  onClick={() => setEngine("openrouter_image")}
                 >
-                  在线万相 AI
-                  <span className="seg-sub">更真实 · 调用阿里</span>
+                  Gemini 生图
+                  <span className="seg-sub">更真实 · OpenRouter</span>
                 </button>
               </div>
             </div>

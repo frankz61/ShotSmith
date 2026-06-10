@@ -7,7 +7,8 @@ SIZE_PRESETS: dict[str, tuple[int, int]] = {
     "4:5": (1080, 1350),
 }
 DEFAULT_SIZES: list[str] = ["1:1", "3:4", "4:5"]
-DEFAULT_SCENE_VARIANTS: int = 3
+# 场景图总张数：轮流分配到所选尺寸，每张配一条不同的创意提示词
+DEFAULT_SCENE_COUNT: int = 5
 
 MIN_SOURCE_SIZE: int = 300   # 源图最短边下限
 MAX_SIDE: int = 2000         # 预处理时的最长边上限
