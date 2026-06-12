@@ -10,6 +10,21 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     storage_dir: str = "./data"
 
+    # 对象存储后端：local(本地磁盘 + /files 静态服务) / oss(阿里云 OSS：服务端签名直传 + 预签名访问)
+    storage_backend: str = "local"
+    # 阿里云 OSS（storage_backend=oss 时必填）。V4 签名要求填地域 ID（如 cn-hangzhou）
+    oss_access_key_id: str = ""
+    oss_access_key_secret: str = ""
+    oss_bucket: str = ""
+    oss_endpoint: str = "https://oss-cn-hangzhou.aliyuncs.com"
+    oss_region: str = "cn-hangzhou"
+    # 同地域 ECS 部署时可填内网 endpoint，服务端上传/下载走内网（免公网流量）；留空用 oss_endpoint
+    oss_internal_endpoint: str = ""
+    oss_url_ttl: int = 3600               # 预签名 URL 有效期（秒）
+    # 缩略图实时处理参数（x-oss-process），列表/网格只拉小图以提速
+    # format,webp 必须有：源多为 PNG，quality 参数仅对 jpg/webp 生效
+    oss_thumb_process: str = "image/resize,w_480/quality,q_85/format,webp"
+
     # 模型 Provider 选择（见 app/providers/registry.py）
     # matting: rembg(质量优,需 .[matting]) / simple(纯 Pillow,离线可跑)
     matting_provider: str = "rembg"

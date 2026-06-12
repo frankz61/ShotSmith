@@ -12,6 +12,7 @@ from app.pipeline.stages import generate, ingest, matting, preprocess, quality
 from app.providers import registry
 from app.services import packaging
 from app.services.prompt import resolve_scene_prompts
+from app.storage import oss
 from app.storage.local import LocalStorage
 
 
@@ -22,11 +23,12 @@ def _opts(raw: dict | None) -> dict:
         "image_types": raw.get("image_types") or ["white_bg", "scene"],
         "scene_count": int(raw.get("scene_count") or DEFAULT_SCENE_COUNT),
         "category_hint": raw.get("category_hint"),
-        # 场景图引擎：local(纯色合成) / openrouter_image(OpenRouter·Gemini)；缺省回落全局默认
+        # 场景图引擎统一走全局默认（Gemini 生图）；保留 options 覆盖以兼容旧任务 regenerate
         "scene_engine": raw.get("scene_engine") or settings.imagegen_provider,
-        # 跨境卖家约束：货源参考链接(如 1688 详情页) + 目标零售平台(amazon/walmart/generic)
+        # 货源参考链接(如 1688 详情页)，抓取标题/描述辅助识图
         "product_url": (raw.get("product_url") or "").strip() or None,
-        "target_platform": raw.get("target_platform") or "generic",
+        # 图中文字语言：none=画面禁文字；en/es/fr/de/… 时结合商品与场景融入该语言文字
+        "text_lang": raw.get("text_lang") or "none",
     }
 
 
@@ -74,6 +76,8 @@ def run(task_id: str) -> None:
 
         _set(db, task, "processing", "package", 95)
         packaging.write_metadata(str(storage.task_dir(str(task.id))), task, items)
+        if oss.enabled():   # 产物整体上 OSS，前端经预签名 URL 直连访问（key=本地相对路径）
+            oss.sync_task_dir(storage.task_dir(str(task.id)), storage.base)
         has_review = any(i.get("qc_status") == "needs_review" for i in items)
         task.status = "partial" if has_review else "success"
         task.current_stage, task.progress = "package", 100

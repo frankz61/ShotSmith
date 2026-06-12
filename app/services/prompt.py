@@ -1,16 +1,11 @@
 import logging
 
 from app.core.config import settings
+from app.core.constants import TEXT_LANGS
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SCENE = "摆放在简洁的生活场景中，自然光，柔和阴影"
-
-# 模板回落时按目标平台微调场景基调（VLM 路径的平台约束见 prompt_vlm._PLATFORM_STYLE）
-_PLATFORM_SCENE = {
-    "amazon": "摆放在明亮通透的欧美家居场景中，自然光，柔和阴影，真实生活方式",
-    "walmart": "摆放在整洁明亮的美式家庭日常场景中，自然光，柔和阴影，务实亲民",
-}
+DEFAULT_SCENE = "摆放在简洁明亮的生活场景中，自然光，柔和阴影，真实生活方式"
 
 # 模板回落时的多样化场景变化：保证 5 张场景图方向各异（与 VLM 创意路径对齐）
 _FALLBACK_STYLES = [
@@ -26,10 +21,21 @@ def build_prompt(description: str | None, opts: dict) -> str:
     base = (description or "").strip()
     if base:
         return base
-    platform = (opts.get("target_platform") or "").lower()
-    scene = _PLATFORM_SCENE.get(platform, DEFAULT_SCENE)
     cat = opts.get("category_hint")
-    return f"{cat}，{scene}" if cat else scene
+    return f"{cat}，{DEFAULT_SCENE}" if cat else DEFAULT_SCENE
+
+
+def _lang_suffix(text_lang: str | None) -> str:
+    """图中文字语言的硬指令，追加在每条生图提示词末尾（VLM/模板两条路径双保险）。"""
+    if not text_lang or text_lang == "none":
+        return ""
+    lang = TEXT_LANGS.get(text_lang, text_lang)
+    return (
+        f"，画面可在商品之外的标牌、包装等场景承载物上自然融入简短贴合商品的{lang}文字，"
+        f"文字必须是{lang}中真实存在的单词或短语、语法正确、拼写准确无误、清晰可读，"
+        f"不得出现其他语言的文字；商品本体上原有的文字、logo、标签必须原样保留，"
+        f"不得翻译、替换、覆盖或修改"
+    )
 
 
 def _wrap(scene: str) -> str:
@@ -53,6 +59,7 @@ def resolve_scene_prompts(
     """
     want_scene = "scene" in (opts.get("image_types") or [])
     online_engine = (opts.get("scene_engine") or settings.imagegen_provider) != "local"
+    suffix = _lang_suffix(opts.get("text_lang"))
     if settings.prompt_vlm_enabled and want_scene and online_engine:
         # 卖家给了货源参考链接（如 1688 详情页）时，尽力抓取标题/描述约束 VLM 判断
         if opts.get("product_url") and not opts.get("product_info"):
@@ -62,13 +69,14 @@ def resolve_scene_prompts(
             from app.services import prompt_vlm
             prompts = prompt_vlm.generate_scene_prompts(cutout_path, description, opts, count)
             logger.info("[Prompt] source=vlm，共 %d 条提示词", len(prompts))
-            return prompts, "vlm"
+            return [p + suffix for p in prompts], "vlm"
         except Exception as e:  # 看图失败不影响出图，回落模板
             logger.warning("VLM 提示词生成失败，回落模板提示词：%s", e)
 
     base = build_prompt(description, opts)
     prompts = [
-        _wrap(f"{base}，{_FALLBACK_STYLES[i % len(_FALLBACK_STYLES)]}") for i in range(count)
+        _wrap(f"{base}，{_FALLBACK_STYLES[i % len(_FALLBACK_STYLES)]}") + suffix
+        for i in range(count)
     ]
     source = "user" if (description or "").strip() else "template"
     logger.info("[Prompt] source=%s，共 %d 条提示词，基底: %r", source, count, base)

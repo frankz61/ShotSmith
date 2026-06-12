@@ -44,8 +44,7 @@ export default function App() {
   const [desc, setDesc] = useState("");
   const [url, setUrl] = useState("");
   const [productUrl, setProductUrl] = useState(""); // 货源参考链接（如 1688 详情页）
-  const [platform, setPlatform] = useState("amazon"); // 目标零售平台，约束场景风格
-  const [engine, setEngine] = useState("local"); // 场景图引擎：local 纯色 / openrouter_image 在线 AI
+  const [textLang, setTextLang] = useState("none"); // 图中文字语言：none=画面禁文字
   const [task, setTask] = useState<Task | null>(null);
   const [history, setHistory] = useState<TaskSummary[]>([]);
   const [busy, setBusy] = useState(false);
@@ -133,7 +132,7 @@ export default function App() {
     if (!file && !url) return;
     setBusy(true);
     try {
-      const t = await createTask(file, url, desc, engine, productUrl, platform);
+      const t = await createTask(file, url, desc, productUrl, textLang);
       setTask(t);
       poll(t.id);
       refreshHistory();
@@ -242,49 +241,22 @@ export default function App() {
               />
             </div>
             <div>
-              <label className="field-label">目标平台</label>
-              <div className="segment">
-                <button
-                  className={platform === "amazon" ? "active" : ""}
-                  onClick={() => setPlatform("amazon")}
-                >
-                  亚马逊
-                  <span className="seg-sub">欧美生活方式</span>
-                </button>
-                <button
-                  className={platform === "walmart" ? "active" : ""}
-                  onClick={() => setPlatform("walmart")}
-                >
-                  Walmart
-                  <span className="seg-sub">美式家庭</span>
-                </button>
-                <button
-                  className={platform === "generic" ? "active" : ""}
-                  onClick={() => setPlatform("generic")}
-                >
-                  通用
-                  <span className="seg-sub">简洁高级</span>
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="field-label">场景图引擎</label>
-              <div className="segment">
-                <button
-                  className={engine === "local" ? "active" : ""}
-                  onClick={() => setEngine("local")}
-                >
-                  纯色背景
-                  <span className="seg-sub">离线 · 免费</span>
-                </button>
-                <button
-                  className={engine === "openrouter_image" ? "active" : ""}
-                  onClick={() => setEngine("openrouter_image")}
-                >
-                  Gemini 生图
-                  <span className="seg-sub">更真实 · OpenRouter</span>
-                </button>
-              </div>
+              <label className="field-label">图中文字语言（按商品与场景自动生成贴合文案）</label>
+              <select
+                className="input"
+                value={textLang}
+                onChange={(e) => setTextLang(e.target.value)}
+              >
+                <option value="none">无文字（默认，画面不出现文字）</option>
+                <option value="en">英语 English</option>
+                <option value="es">西班牙语 Español</option>
+                <option value="fr">法语 Français</option>
+                <option value="de">德语 Deutsch</option>
+                <option value="it">意大利语 Italiano</option>
+                <option value="pt">葡萄牙语 Português</option>
+                <option value="ja">日语 日本語</option>
+                <option value="th">泰语 ไทย</option>
+              </select>
             </div>
             <button
               className="btn btn-primary"
@@ -313,7 +285,13 @@ export default function App() {
                   onClick={() => openTask(h.id)}
                 >
                   {h.source_image && (
-                    <img className="history-thumb" src={h.source_image} alt="" />
+                    <img
+                      className="history-thumb"
+                      src={h.source_image}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
                   )}
                   <div className="history-text">
                     <div className="history-title">{h.description || "（无描述）"}</div>
@@ -386,7 +364,15 @@ export default function App() {
                           className={`asset${a.selected ? " selected" : ""}`}
                           style={{ margin: 0 }}
                         >
-                          <img className="asset-thumb" src={fileUrl(a.path)} alt={a.type} />
+                          <a href={a.url ?? fileUrl(a.path)} target="_blank" rel="noreferrer">
+                            <img
+                              className="asset-thumb"
+                              src={a.thumb_url ?? a.url ?? fileUrl(a.path)}
+                              alt={a.type}
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </a>
                           <figcaption className="asset-body">
                             <div className="asset-row">
                               <span className="asset-type">{typeLabel(a.type)}</span>

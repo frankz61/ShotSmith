@@ -12,9 +12,21 @@ def run(task, storage) -> Path:
         p = storage.find_source(tid)
         if p is None:
             raise ValueError("未找到上传的源图")
+    elif task.source_type == "oss":
+        p = _from_oss(task.source_ref, storage.task_dir(tid))
     else:
         p = _download(task.source_ref, storage.task_dir(tid))
     _validate(p)
+    return p
+
+
+def _from_oss(key: str, out_dir: Path) -> Path:
+    """前端直传 OSS 的源图：按 key 拉到本地任务目录供流水线处理。"""
+    from app.storage import oss
+
+    ext = Path(key).suffix.lower() or ".png"
+    p = Path(out_dir) / f"00_source{ext}"
+    oss.download_file(key, p)
     return p
 
 

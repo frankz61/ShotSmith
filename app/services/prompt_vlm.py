@@ -39,47 +39,58 @@ _DESCRIBE_SYSTEM = (
     "不超过 100 个汉字，输出纯文本。"
 )
 
-# 创意场景提示词：每条都是给图像生成模型的完整自然语句（含商品保持指令）
-_CREATIVE_SYSTEM = (
-    "你是资深跨境电商视觉设计师与创意总监。用户是电商卖家，从批发平台（如 1688）选品，"
-    "将商品发布到海外零售平台（如亚马逊、Walmart）销售。"
-    "请基于给定的商品信息，为 AI 图像生成写场景提示词。每条提示词必须是一段自然流畅的"
-    "中文完整描述，参照这个范例的口吻与结构："
-    "『保持参考图中的双筒望远镜不变，放置在森林木桩或户外桌面上，"
-    "背景有绿色树林、阳光光斑和远处小鸟虚化元素，表现观鸟、自然观察、户外探索，"
-    "产品镜片反射蓝紫光，真实摄影风格，电商详情页场景图。』"
-    "结构要素依次为："
-    "① 以『保持参考图中的{具体商品名}不变』开头；"
-    "② 放置位置（台面/地面/手边等具体可视的承托物）；"
-    "③ 背景环境元素（道具、光线、色调、虚化元素，写具体不空泛）；"
-    "④ 表现的用途、生活方式或情绪；"
-    "⑤ 商品与光影的互动细节（如镜片反光、金属高光、织物纹理受光、瓷面柔光）；"
-    "⑥ 以『真实摄影风格，电商详情页场景图』结尾。"
-    "硬性要求："
-    "1) 绝不改动商品本身的形状、颜色、材质与文字细节，互动只限光影层面；"
-    "2) 每条的场景方向必须明显不同（家居生活、户外自然、节日氛围、极简棚拍、质感特写等），"
-    "且都贴合商品真实用途；"
-    "3) 场景元素符合目标市场消费者的生活方式与审美；"
-    "4) 画面中不得出现任何文字、品牌 logo、水印、价签、人脸；"
-    "5) 每条 50~100 个汉字；"
-    "6) 只输出 JSON 字符串数组（如 [\"…\",\"…\"]），不要其他解释。"
+# 通用风格基调（不再按平台区分）：作为 user 消息的一部分注入，约束输出范围避免跑偏
+_STYLE_HINT = (
+    "场景图用于电商 listing 副图/生活方式图：真实自然的使用环境、明亮通透光线、"
+    "干净不杂乱、简洁高级、贴合商品调性，突出商品使用情境。"
 )
 
-# 目标平台风格约束：作为 user 消息的一部分注入，约束输出范围避免跑偏
-_PLATFORM_STYLE = {
-    "amazon": (
-        "目标平台：亚马逊（Amazon）。场景图用于 listing 副图/生活方式图，"
-        "面向欧美消费者：真实自然的使用环境、明亮通透光线、欧美家居或户外风格，"
-        "干净不杂乱，突出商品使用情境。"
-    ),
-    "walmart": (
-        "目标平台：Walmart。面向美国大众家庭消费者：场景务实亲民、明亮整洁，"
-        "典型美式家庭/日常生活环境，避免过度奢华或小众风格。"
-    ),
-    "generic": (
-        "目标平台：通用零售电商。场景简洁高级、贴合商品调性，适合电商场景图。"
-    ),
-}
+
+def _creative_system(text_lang: str) -> str:
+    """创意场景提示词的系统指令；图中文字规则按所选语言动态生成。
+
+    text_lang="none" 时画面禁文字；否则要求结合商品与场景，在画面合理位置
+    融入贴合的该语言文字，并在提示词中写明具体文字内容与位置。
+    """
+    from app.core.constants import TEXT_LANGS
+
+    if text_lang != "none" and text_lang in TEXT_LANGS:
+        lang = TEXT_LANGS[text_lang]
+        text_rule = (
+            f"4) 结合商品特点与场景氛围，在商品之外的场景承载物上（背景招牌、标牌、"
+            f"包装盒、横幅、贴纸等）自然融入简短的{lang}文字（1~4 个单词或一个短语）。"
+            f"文字只能加在场景道具上，绝不能加在商品本体上；商品上原有的文字、logo、"
+            f"标签必须原样保留，不得翻译、替换、覆盖或修改。文字内容必须是该语言中"
+            f"真实存在的单词或短语，语法正确、拼写准确无误，不得生造词；"
+            f"每条提示词必须用引号写明具体文字内容及其出现位置；"
+            f"除该文字外不得出现其他语言文字、品牌 logo、水印、价签、人脸；"
+        )
+    else:
+        text_rule = "4) 画面中不得出现任何文字、品牌 logo、水印、价签、人脸；"
+    return (
+        "你是资深跨境电商视觉设计师与创意总监。用户是电商卖家，从批发平台（如 1688）选品，"
+        "将商品发布到海外零售平台销售。"
+        "请基于给定的商品信息，为 AI 图像生成写场景提示词。每条提示词必须是一段自然流畅的"
+        "中文完整描述，参照这个范例的口吻与结构："
+        "『保持参考图中的双筒望远镜不变，放置在森林木桩或户外桌面上，"
+        "背景有绿色树林、阳光光斑和远处小鸟虚化元素，表现观鸟、自然观察、户外探索，"
+        "产品镜片反射蓝紫光，真实摄影风格，电商详情页场景图。』"
+        "结构要素依次为："
+        "① 以『保持参考图中的{具体商品名}不变』开头；"
+        "② 放置位置（台面/地面/手边等具体可视的承托物）；"
+        "③ 背景环境元素（道具、光线、色调、虚化元素，写具体不空泛）；"
+        "④ 表现的用途、生活方式或情绪；"
+        "⑤ 商品与光影的互动细节（如镜片反光、金属高光、织物纹理受光、瓷面柔光）；"
+        "⑥ 以『真实摄影风格，电商详情页场景图』结尾。"
+        "硬性要求："
+        "1) 绝不改动商品本身的形状、颜色、材质与文字细节，互动只限光影层面；"
+        "2) 每条的场景方向必须明显不同（家居生活、户外自然、节日氛围、极简棚拍、质感特写等），"
+        "且都贴合商品真实用途；"
+        "3) 场景元素符合目标市场消费者的生活方式与审美；"
+        f"{text_rule}"
+        "5) 每条 50~100 个汉字；"
+        "6) 只输出 JSON 字符串数组（如 [\"…\",\"…\"]），不要其他解释。"
+    )
 
 
 def _encode_data_uri(cutout_path: str) -> str:
@@ -169,8 +180,7 @@ def _parse_prompts(raw: str) -> list[str]:
 
 def _build_user_text(opts: dict, description: str | None, count: int,
                      product_desc: str | None) -> str:
-    platform = (opts.get("target_platform") or "generic").lower()
-    hints: list[str] = [_PLATFORM_STYLE.get(platform, _PLATFORM_STYLE["generic"])]
+    hints: list[str] = [_STYLE_HINT]
     if product_desc:
         hints.append(f"商品描述（来自看图识别）：{product_desc}")
     if opts.get("category_hint"):
@@ -196,6 +206,7 @@ def generate_scene_prompts(
         raise RuntimeError("未配置 OPENROUTER_API_KEY，无法调用 OpenRouter。")
 
     model = settings.openrouter_text_model
+    creative_system = _creative_system(opts.get("text_lang") or "none")
     with httpx.Client(timeout=settings.vlm_timeout) as client:
         # 优先单段：创意模型直接看图（细节最忠实）；纯文本模型带图会 404，回落两段式
         user_text = _build_user_text(opts, description, count, None)
@@ -203,7 +214,7 @@ def generate_scene_prompts(
         t0 = time.monotonic()
         try:
             data = _chat(client, model, [
-                {"role": "system", "content": _CREATIVE_SYSTEM},
+                {"role": "system", "content": creative_system},
                 {
                     "role": "user",
                     "content": [
@@ -221,7 +232,7 @@ def generate_scene_prompts(
             user_text = _build_user_text(opts, description, count, product_desc)
             t0 = time.monotonic()
             data = _chat(client, model, [
-                {"role": "system", "content": _CREATIVE_SYSTEM},
+                {"role": "system", "content": creative_system},
                 {"role": "user", "content": user_text},
             ], key)
 

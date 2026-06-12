@@ -11,7 +11,8 @@ AI 电商商品素材图生成工具：**一张商品图 + 可选描述 → 一�
 - **后端**：FastAPI（API:28000）+ Celery（Redis broker）+ SQLAlchemy（MySQL）
 - **前端**：React + Vite + TypeScript（25173）
 - **抠图**：rembg / BiRefNet（SOTA，可选 simple 纯 Pillow 兜底）
-- **场景生成**：Pillow 纯色合成（离线）/ OpenRouter·Gemini 生图（在线 AI），**按任务可选**
+- **场景生成**：OpenRouter·Gemini 生图（默认），支持选择**图中文字语言**（英/西/法/德/泰等，
+  按商品与场景自动生成贴合文案融入画面）；local 纯色合成保留为离线兜底（`.env` 切换）
 - **还原度校验**：Pillow 比对（可选 DINOv2 向量相似）
 
 > Redis 与 MySQL 为外部服务，连接串在 `.env`（已 gitignore，勿提交）。
@@ -49,15 +50,15 @@ AI 电商商品素材图生成工具：**一张商品图 + 可选描述 → 一�
 | 场景生成 `imagegen` | `ImageGenProvider.generate` | `local`(纯色合成) / `openrouter_image`(OpenRouter·Gemini 生图) / `vendor_a`(预留) | **页面按任务选** → `options.scene_engine`，缺省回落 `IMAGEGEN_PROVIDER` |
 | 还原度 `fidelity` | `FidelityProvider.score` | `simple`(Pillow) / `dinov2`(向量，需 torch) | `FIDELITY_PROVIDER` |
 
-白底主图始终走 Pillow 合成（商品像素原样粘贴，还原度天然≈1）；**场景图引擎**才是页面那个下拉切换的对象。
+白底主图始终走 Pillow 合成（商品像素原样粘贴，还原度天然≈1）；场景图引擎由 `IMAGEGEN_PROVIDER` 全局指定（默认 Gemini 生图，页面不再选择）。
 
-## 场景图引擎：纯色 vs OpenRouter·Gemini 生图
+## 场景图引擎：OpenRouter·Gemini 生图（默认）
 
-页面表单「场景图引擎」每次任务可选，随 `options={scene_engine}` 提交：
-
-- **`local`（纯色背景 · 离线免费）**：把抠图贴到预设渐变背景并加投影，商品像素保持。
-- **`openrouter_image`（Gemini 生图 · 经 OpenRouter）**：商品主体放到透明画布做 base，
+- **`openrouter_image`（默认）**：商品主体放到透明画布做 base，
   经 OpenRouter 调 `google/gemini-3.1-flash-image-preview`（Nano Banana 2）补全背景、保留前景商品。
+- **`local`（离线兜底）**：把抠图贴到预设渐变背景并加投影，`.env` 切 `IMAGEGEN_PROVIDER=local` 启用。
+
+**图中文字语言**：页面下拉选择（默认「无文字」），随 `options.text_lang` 提交。选定语言（en/es/fr/de/it/pt/ja/th）后，创意提示词阶段会要求模型**结合商品与场景，自动生成贴合的该语言短文案**（如背景招牌、包装、标牌上的字），并在生图提示词末尾追加语言硬指令双保险；「无文字」时维持原有「画面禁文字」约束。注意：非拉丁文字（泰语等）生图渲染易出错，建议人工复核；白底主图始终无文字（平台主图合规）。
 
 `openrouter_image` 流程（[`app/providers/imagegen/openrouter_image.py`](app/providers/imagegen/openrouter_image.py)）：每尺寸建透明底主体图 → 以 base64 data URI 随 `chat/completions` 请求提交（`modalities=["image","text"]`，`image_config` 控制比例与分辨率档位）→ 从 `message.images` 解码 base64 结果 → 缩放到精确导出尺寸。商品位置 `bbox` 随结果回传，使还原度校验只比对商品区域；网络瞬断有传输层重试。
 
@@ -75,14 +76,14 @@ OPENROUTER_API_KEY=sk-or-v1-xxxx
 在线引擎（`openrouter_image` / `vendor_a`）生成场景图前，为**每张图各产出一条不同的创意提示词**（默认 5 张 → 5 条），经 OpenRouter 两段完成：
 
 1. **视觉识别**（`OPENROUTER_VLM_MODEL`，默认 `gemini-3.1-flash-lite`）：看「去背景后的商品图」输出一句客观商品描述；
-2. **创意生成**（`OPENROUTER_TEXT_MODEL`，默认 `deepseek/deepseek-v4-pro`）：结合商品描述 + 平台/品类/链接约束，一次产出 N 条场景方向各异（家居/户外/节日/棚拍/质感特写…）的中文提示词（JSON 数组）。
+2. **创意生成**（`OPENROUTER_TEXT_MODEL`，默认 `deepseek/deepseek-v4-pro`）：结合商品描述 + 品类/链接约束 + 图中文字语言要求，一次产出 N 条场景方向各异（家居/户外/节日/棚拍/质感特写…）的中文提示词（JSON 数组）。
 
 实现见 [`app/services/prompt_vlm.py`](app/services/prompt_vlm.py)，编排与回落见 [`app/services/prompt.py`](app/services/prompt.py)`resolve_scene_prompts`。
 
 - 走 OpenRouter **OpenAI 兼容端点**，抠图以 base64 内联（喂模型前缩到长边≤1024 省 token），只依赖 `httpx`。
 - 为何拆两段：deepseek 系列为纯文本模型（带图请求 OpenRouter 返回 404），视觉小模型负责"看"、创意模型负责"想"，各取所长。
 - 提示词只描述背景（光线/氛围/道具/构图），**绝不描述或改动商品本身**，契合「AI 不得篡改商品本体」第一约束。
-- 支持跨境卖家约束：货源参考链接（自动抓取标题/描述）+ 目标平台（亚马逊/Walmart/通用）注入提示词，避免场景跑偏。
+- 支持跨境卖家约束：货源参考链接（自动抓取标题/描述）注入提示词，避免品类判断跑偏。
 - **失败即回落**：任一段报错/返回空时，自动回落到「模板 + 5 种风格变化」，不阻断出图。`local` 引擎用纯渐变背景、不消费 prompt，故跳过。
 - 每张 scene 资产的 `gen_params` 记录自己用的那条提示词与来源（`vlm`/`user`/`template`）。
 
@@ -102,7 +103,8 @@ OPENROUTER_TEXT_MODEL=deepseek/deepseek-v4-pro
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/tasks` | 创建任务（multipart：`file`/`url` + `description` + `options`），入队 |
+| POST | `/uploads/presign` | OSS 直传预签名（`{filename, content_type}` → `{key, url, headers}`），local 模式返回 409 |
+| POST | `/tasks` | 创建任务（multipart：`file`/`url`/`source_key` + `description` + `options`），入队 |
 | GET | `/tasks` | 历史列表（轻量摘要） |
 | GET | `/tasks/{id}` | 任务详情 + 素材 |
 | GET | `/tasks/{id}/assets` | 素材列表 |
@@ -110,7 +112,29 @@ OPENROUTER_TEXT_MODEL=deepseek/deepseek-v4-pro
 | POST | `/assets/{id}/select` | 勾选/取消选用 |
 | GET | `/tasks/{id}/package` | 打包下载 zip |
 
-静态产物经 `/files/{path}` 访问；健康检查 `/health`。
+local 模式产物经 `/files/{path}` 静态访问；OSS 模式素材返回 `url` / `thumb_url`（预签名）。健康检查 `/health`。
+
+## 对象存储：本地磁盘 vs 阿里云 OSS
+
+`STORAGE_BACKEND` 二选一（默认 `local`）：
+
+- **`local`**：产物落 `STORAGE_DIR`，经 `/files/{path}` 静态服务。开发零依赖，但上传/查看都经应用服务器中转。
+- **`oss`**：上传走**服务端签名直传**（后端签发预签名 PUT 地址，浏览器直传 OSS），查看走**预签名 GET URL** 直连 OSS，应用服务器不再中转图片流量；docker-compose 下 API 与 worker 容器**无需共享磁盘**。
+
+OSS 模式链路：
+
+```
+前端 ─POST /uploads/presign─▶ 后端签名(V4) ─▶ 前端 PUT 直传 OSS (uploads/{yyyymm}/{uuid}.ext)
+    ─POST /tasks {source_key}─▶ worker 拉源图跑流水线 ─▶ 产物同步 OSS (tasks/{task_id}/…)
+    ─GET /tasks/{id}─▶ 返回素材预签名 url / thumb_url（thumb 经 x-oss-process 实时缩放）
+```
+
+要点：
+
+- **DB 不存 URL**：`asset.path` / `task.source_ref` 只存 object key（与本地相对路径一致），预签名 URL 有时效（`OSS_URL_TTL`，默认 1 小时），每次查询由后端实时签名生成。
+- **直传必须配 Bucket CORS**（OSS 控制台 → 数据安全 → 跨域设置）：允许来源=前端域名（开发可 `*`）、方法=`PUT,GET`、允许 Headers=`*`，否则浏览器 PUT 被拦（前端会自动回退 multipart 经后端中转，功能不断但失去直传加速）。
+- **加载提速**：列表/网格用 `thumb_url`（`OSS_THUMB_PROCESS` 实时缩放小图）+ 前端懒加载，点击缩略图新窗口看原图；Bucket 建议选离用户近的地域，可再叠加 CDN 加速域名。
+- **存量数据**：切到 OSS 前已生成的任务，产物只在本地磁盘；如需在 OSS 模式下继续访问，用 ossutil 同步一次：`ossutil cp -r ./data/tasks oss://<bucket>/tasks/`。
 
 ## 启动
 
@@ -124,7 +148,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 28000
 # Windows 下 Celery 需 solo 池：
 celery -A app.tasks.celery_app.celery_app worker --loglevel=info --pool=solo
 
-cd web && npm install && npm run dev      # 前端 25173
+cd web && npm install && npm run dev      # 前端 25173（开发模式，热更新）
 ```
 
 访问：前端 http://localhost:25173 ，后端文档 http://localhost:28000/docs 。

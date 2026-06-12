@@ -6,6 +6,9 @@ export interface Asset {
   fidelity_score: number | null;
   qc_status: string;
   selected: boolean;
+  // 后端实时生成的可展示地址：OSS 预签名 URL（有时效）或本地 /files/…
+  url: string | null;
+  thumb_url: string | null;
 }
 
 export interface Task {
@@ -69,24 +72,52 @@ export async function login(password: string): Promise<void> {
   setToken(data.token);
 }
 
+// 服务端签名直传：向后端要预签名 PUT 地址 → 浏览器直传 OSS → 返回 object key。
+// 后端未启用 OSS（409）或直传失败时返回 null，回退为 multipart 经后端中转。
+async function uploadDirect(file: File): Promise<string | null> {
+  try {
+    const res = await apiFetch(`${API}/uploads/presign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename: file.name || "paste.png",
+        content_type: file.type || "image/png",
+      }),
+    });
+    if (!res.ok) return null;
+    const { key, url, headers } = (await res.json()) as {
+      key: string;
+      url: string;
+      headers: Record<string, string>;
+    };
+    const up = await fetch(url, { method: "PUT", headers, body: file });
+    return up.ok ? key : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function createTask(
   file: File | null,
   url: string,
   description: string,
-  sceneEngine: string,
   productUrl: string,
-  targetPlatform: string,
+  textLang: string,
 ): Promise<Task> {
   const form = new FormData();
-  if (file) form.append("file", file);
+  if (file) {
+    const key = await uploadDirect(file);
+    if (key) form.append("source_key", key);
+    else form.append("file", file);
+  }
   if (url) form.append("url", url);
   if (description) form.append("description", description);
   form.append(
     "options",
     JSON.stringify({
-      scene_engine: sceneEngine,
       product_url: productUrl || undefined,
-      target_platform: targetPlatform,
+      // 图中文字语言：none=画面禁文字；其余按所选语言在图中融入贴合的文字
+      text_lang: textLang,
     }),
   );
   const res = await apiFetch(`${API}/tasks`, { method: "POST", body: form });
@@ -125,6 +156,7 @@ export async function selectAsset(id: string, selected: boolean): Promise<void> 
   });
 }
 
+// 本地存储模式的兜底地址；OSS 模式下优先用后端返回的 url / thumb_url
 export const fileUrl = (path: string) => `/files/${path}`;
 // 下载走 <a href> 无法设请求头，令牌以查询参数携带（后端 require_auth 兼容 ?token=）
 export const packageUrl = (id: string) =>
