@@ -6,21 +6,38 @@ from PIL import Image, ImageDraw, ImageFilter
 
 Bbox = tuple[int, int, int, int]
 
+# 场景图构图布局：按张轮换，避免每张商品都居中同大小的"贴图感"。
+# cx/cy 为商品中心在画面中的相对位置（cy 略低于中线，给承托面和上方环境留空间）。
+SCENE_LAYOUTS: list[dict] = [
+    {"ratio": 0.66, "cx": 0.50, "cy": 0.58, "desc": "画面中部偏下居中"},
+    {"ratio": 0.56, "cx": 0.38, "cy": 0.60, "desc": "画面左侧三分之一、中部偏下"},
+    {"ratio": 0.56, "cx": 0.62, "cy": 0.60, "desc": "画面右侧三分之一、中部偏下"},
+    {"ratio": 0.78, "cx": 0.50, "cy": 0.54, "desc": "画面中央大特写"},
+    {"ratio": 0.50, "cx": 0.50, "cy": 0.64, "desc": "画面下半部居中、上方留出环境空间"},
+]
+
 
 def _trim(img: Image.Image) -> Image.Image:
     bb = img.split()[3].getbbox()
     return img.crop(bb) if bb else img
 
 
-def _fit(cutout: Image.Image, cw: int, ch: int, ratio: float) -> tuple[Image.Image, Bbox]:
+def _fit_at(cutout: Image.Image, cw: int, ch: int, ratio: float,
+            cx: float = 0.5, cy: float = 0.5) -> tuple[Image.Image, Bbox]:
+    """按 ratio 缩放商品，把中心放到画面 (cx, cy) 相对位置，越界自动收回画内。"""
     pw, ph = cutout.size
     if pw == 0 or ph == 0:
         return cutout, (0, 0, cw, ch)
     scale = min(cw * ratio / pw, ch * ratio / ph)
     nw, nh = max(1, int(pw * scale)), max(1, int(ph * scale))
     resized = cutout.resize((nw, nh), Image.LANCZOS)
-    x, y = (cw - nw) // 2, (ch - nh) // 2
+    x = max(0, min(int(cw * cx - nw / 2), cw - nw))
+    y = max(0, min(int(ch * cy - nh / 2), ch - nh))
     return resized, (x, y, x + nw, y + nh)
+
+
+def _fit(cutout: Image.Image, cw: int, ch: int, ratio: float) -> tuple[Image.Image, Bbox]:
+    return _fit_at(cutout, cw, ch, ratio)
 
 
 def _gradient(w: int, h: int, top: tuple, bottom: tuple) -> Image.Image:
@@ -62,14 +79,19 @@ def scene(cutout_path: str, w: int, h: int, preset: dict, ratio: float = 0.70) -
     return canvas.convert("RGB"), bbox
 
 
-def place_on_transparent(cutout_path: str, w: int, h: int, ratio: float = 0.72) -> tuple[Image.Image, Bbox]:
-    """把商品按目标尺寸居中放到透明画布上，返回 RGBA 图与商品 bbox。
+def place_on_transparent(cutout_path: str, w: int, h: int, ratio: float = 0.72,
+                         layout: dict | None = None) -> tuple[Image.Image, Bbox]:
+    """把商品放到透明画布上，返回 RGBA 图与商品 bbox。
 
     用作背景生成 API 的 base_image：API 只在透明区域生成背景、保留前景商品，
     因此这里确定的 bbox 即生成结果中商品所在区域，可直接用于还原度校验。
+    layout（见 SCENE_LAYOUTS）控制位置与大小，按张轮换以丰富构图；缺省居中。
     """
     cut = _trim(Image.open(cutout_path).convert("RGBA"))
     canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    prod, bbox = _fit(cut, w, h, ratio)
+    if layout:
+        prod, bbox = _fit_at(cut, w, h, layout["ratio"], layout["cx"], layout["cy"])
+    else:
+        prod, bbox = _fit(cut, w, h, ratio)
     canvas.alpha_composite(prod, (bbox[0], bbox[1]))
     return canvas, bbox

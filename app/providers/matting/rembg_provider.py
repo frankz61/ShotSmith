@@ -1,16 +1,37 @@
+import logging
 from pathlib import Path
 
 from app.core.config import settings
 from app.providers.base import CutoutResult
 
+logger = logging.getLogger(__name__)
+
 _session = None  # 缓存 rembg 模型 session，避免每个任务重复加载
+
+# GPU 执行后端优先级：CUDA(NVIDIA) > ROCm(AMD Linux) > DirectML(Windows 任意 DX12 显卡)
+_GPU_PROVIDERS = ("CUDAExecutionProvider", "ROCMExecutionProvider", "DmlExecutionProvider")
+
+
+def _providers() -> list[str]:
+    """按 matting_device 选推理后端。rembg 自动逻辑只认 CUDA/ROCm，DirectML 须显式指定。"""
+    import onnxruntime as ort
+
+    available = ort.get_available_providers()
+    if settings.matting_device != "cpu":
+        for p in _GPU_PROVIDERS:
+            if p in available:
+                return [p, "CPUExecutionProvider"]
+    return ["CPUExecutionProvider"]
 
 
 def _get_session():
     global _session
     if _session is None:
         from rembg import new_session
-        _session = new_session(settings.matting_model)
+        providers = _providers()
+        _session = new_session(settings.matting_model, providers=providers)
+        logger.info("[Matting] rembg session 就绪：model=%s providers=%s",
+                    settings.matting_model, _session.inner_session.get_providers())
     return _session
 
 

@@ -21,8 +21,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.9"]
-# BiRefNet 需要 rembg 较新版本
+# BiRefNet 需要 rembg 较新版本；onnxruntime 两个发行版二选一（同名模块、互相覆盖）：
+# matting = CPU 推理；matting-dml = Windows DirectML GPU 加速（AMD/Intel/NVIDIA 任意 DX12 显卡）
 matting = ["rembg>=2.0.57", "onnxruntime>=1.17"]
+matting-dml = ["rembg>=2.0.57", "onnxruntime-directml>=1.20"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]

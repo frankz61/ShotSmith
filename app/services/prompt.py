@@ -1,19 +1,19 @@
 import logging
 
 from app.core.config import settings
-from app.core.constants import TEXT_LANGS
+from app.core.constants import LANG_MARKET_HINTS, LANG_TYPO_HINTS, TEXT_LANGS
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_SCENE = "摆放在简洁明亮的生活场景中，自然光，柔和阴影，真实生活方式"
 
-# 模板回落时的多样化场景变化：保证 5 张场景图方向各异（与 VLM 创意路径对齐）
+# 模板回落时的多样化场景变化：保证 5 张场景图方向/视角/光线各异（与 VLM 创意路径对齐）
 _FALLBACK_STYLES = [
-    "背景是明亮客厅的木质桌面与落地窗自然光",
-    "背景是大理石台面搭配绿植与柔和晨光",
-    "背景是户外木桌与阳光草地的虚化光斑",
-    "背景是极简纯色摄影棚的专业柔光",
-    "背景是温馨暖色调台面与浅景深氛围光",
+    "稳放在明亮客厅的木质桌面上，背景落地窗自然光与绿植虚化，45 度俯拍，浅景深",
+    "置于大理石台面，旁边咖啡杯与摊开的杂志点缀，柔和晨光从侧面照入，平视近景",
+    "摆在户外原木桌上，背景阳光草地光斑虚化，黄金时刻暖光，低角度视角",
+    "放在极简摄影棚的哑光展台上，专业柔光箱布光，干净高级，居中棚拍",
+    "置于温馨编织桌布上，旁有暖色灯光与织物褶皱，浅景深氛围光，质感特写",
 ]
 
 
@@ -30,11 +30,18 @@ def _lang_suffix(text_lang: str | None) -> str:
     if not text_lang or text_lang == "none":
         return ""
     lang = TEXT_LANGS.get(text_lang, text_lang)
+    market = LANG_MARKET_HINTS.get(text_lang)
+    market_part = f"；整体场景风格贴近{market}" if market else ""
+    typo = LANG_TYPO_HINTS.get(text_lang)
+    typo_part = f"，文字样式美观时尚：{typo}" if typo else ""
     return (
-        f"，画面可在商品之外的标牌、包装等场景承载物上自然融入简短贴合商品的{lang}文字，"
-        f"文字必须是{lang}中真实存在的单词或短语、语法正确、拼写准确无误、清晰可读，"
-        f"不得出现其他语言的文字；商品本体上原有的文字、logo、标签必须原样保留，"
-        f"不得翻译、替换、覆盖或修改"
+        f"，在画面留白处以电商主图卖点标注版式加入 1~3 条简短的{lang}产品属性词条"
+        f"（每条 1~3 个单词），属性只能从商品可见特征提炼、绝不臆造，"
+        f"词条必须是{lang}中真实存在的词、语法正确、拼写准确、清晰可读且不遮挡商品"
+        f"{typo_part}；"
+        f"不要在招牌、标牌、包装等场景物体上加文字；"
+        f"商品本体上原有的文字、logo、标签必须原样保留，不得翻译、替换、覆盖或修改"
+        f"{market_part}"
     )
 
 
@@ -42,7 +49,8 @@ def _wrap(scene: str) -> str:
     """把场景描述包装成与 VLM 创意路径同款的完整生图提示词。"""
     return (
         f"保持参考图中的商品不变，{scene}，"
-        "商品与场景光影自然融合，真实摄影风格，电商详情页场景图"
+        "商品自然贴合承托面、底部有柔和接触阴影，光线方向与场景统一，"
+        "真实摄影风格，电商详情页场景图"
     )
 
 

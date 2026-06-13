@@ -28,8 +28,12 @@ class Settings(BaseSettings):
     # 模型 Provider 选择（见 app/providers/registry.py）
     # matting: rembg(质量优,需 .[matting]) / simple(纯 Pillow,离线可跑)
     matting_provider: str = "rembg"
-    # rembg 模型：birefnet-general 当前质量最佳；备选 isnet-general-use / u2net
+    # rembg 模型：birefnet-general 当前质量最佳；备选 birefnet-general-lite(更快) / u2net
     matting_model: str = "birefnet-general"
+    # 抠图推理设备：auto(有 GPU 执行后端就用，如 onnxruntime-directml 的 AMD/Intel 显卡
+    # 或 onnxruntime-gpu 的 CUDA) / cpu(强制 CPU)。rembg 默认只认 CUDA/ROCm，
+    # DirectML 须显式传 providers，见 providers/matting/rembg_provider.py
+    matting_device: str = "auto"
     # imagegen: local(Pillow 合成,离线可跑) / openrouter_image(OpenRouter·Gemini 生图)
     #           / vendor_a(其它商用 API)
     imagegen_provider: str = "local"

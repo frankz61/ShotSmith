@@ -58,7 +58,7 @@ AI 电商商品素材图生成工具：**一张商品图 + 可选描述 → 一�
   经 OpenRouter 调 `google/gemini-3.1-flash-image-preview`（Nano Banana 2）补全背景、保留前景商品。
 - **`local`（离线兜底）**：把抠图贴到预设渐变背景并加投影，`.env` 切 `IMAGEGEN_PROVIDER=local` 启用。
 
-**图中文字语言**：页面下拉选择（默认「无文字」），随 `options.text_lang` 提交。选定语言（en/es/fr/de/it/pt/ja/th）后，创意提示词阶段会要求模型**结合商品与场景，自动生成贴合的该语言短文案**（如背景招牌、包装、标牌上的字），并在生图提示词末尾追加语言硬指令双保险；「无文字」时维持原有「画面禁文字」约束。注意：非拉丁文字（泰语等）生图渲染易出错，建议人工复核；白底主图始终无文字（平台主图合规）。
+**图中文字语言**：页面下拉选择（默认「无文字」），随 `options.text_lang` 提交。选定语言（en/es/fr/de/it/pt/ja/th）后，场景图会以**电商主图卖点标注版式**（简洁属性标签文字，如『舒适透气』『大容量』的对应语言说法）在画面留白处加入 1~3 条产品属性词条；属性只能从商品可见特征/描述/链接信息中提炼、**绝不臆造**；不在场景道具（招牌、标牌、包装）上加字，商品本体原有文字/logo 原样保留。创意阶段与生图提示词末尾双层硬指令保障；「无文字」时维持原有「画面禁文字」约束。注意：非拉丁文字（泰语等）渲染易出错，建议人工复核；白底主图始终无文字（平台主图合规）。
 
 `openrouter_image` 流程（[`app/providers/imagegen/openrouter_image.py`](app/providers/imagegen/openrouter_image.py)）：每尺寸建透明底主体图 → 以 base64 data URI 随 `chat/completions` 请求提交（`modalities=["image","text"]`，`image_config` 控制比例与分辨率档位）→ 从 `message.images` 解码 base64 结果 → 缩放到精确导出尺寸。商品位置 `bbox` 随结果回传，使还原度校验只比对商品区域；网络瞬断有传输层重试。
 

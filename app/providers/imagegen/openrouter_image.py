@@ -55,10 +55,21 @@ class OpenRouterImageProvider:
 
         url = f"{settings.openrouter_api_base.rstrip('/')}/chat/completions"
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        # 构图布局按全局序号轮换（位置/大小各不相同），并把实际摆放位置写进提示词，
+        # 要求模型围绕该位置造景、做接触阴影与光线统一——这是"贴图感"的主要解药
+        layout = composition.SCENE_LAYOUTS[max(seq - 1, 0) % len(composition.SCENE_LAYOUTS)]
+        logger.info("[OpenRouterImage] 构图布局：%s（ratio=%.2f）", layout["desc"], layout["ratio"])
+        grounding = (
+            f"。商品位于{layout['desc']}，保持其位置与大小不变，围绕它构建完整场景："
+            "商品必须自然放置或依托在场景中真实的承托面/支撑物上，底部接触处有贴合的"
+            "接触阴影，投影方向与场景主光源一致，商品周围的环境光、色温、透视与整体"
+            "场景完全统一，使商品看起来是实拍于场景之中，而非后期贴图"
+        )
         results: list[GeneratedImage] = []
         with httpx.Client(timeout=settings.openrouter_image_timeout) as client:
             for label, w, h in sizes:
-                base_img, bbox = composition.place_on_transparent(product_cutout, w, h)
+                base_img, bbox = composition.place_on_transparent(product_cutout, w, h,
+                                                                  layout=layout)
                 buf = io.BytesIO()
                 base_img.save(buf, format="PNG")
                 data_uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
@@ -66,7 +77,8 @@ class OpenRouterImageProvider:
                 # 该接口一次通常返回 1 张图，多变体逐次请求
                 for i in range(n):
                     t0 = time.monotonic()
-                    images = self._create(client, url, headers, data_uri, full_prompt, label)
+                    images = self._create(client, url, headers, data_uri,
+                                          full_prompt + grounding, label)
                     logger.info(
                         "[OpenRouterImage] 尺寸 %s 第 %d/%d 张完成，耗时 %.1fs",
                         label, i + 1, n, time.monotonic() - t0,
